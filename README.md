@@ -1,32 +1,60 @@
-# FreeRDP: A Remote Desktop Protocol Implementation
 
-FreeRDP is a free implementation of the Remote Desktop Protocol (RDP), released under the Apache license.
-Enjoy the freedom of using your software wherever you want, the way you want it, in a world where
-interoperability can finally liberate your computing experience.
+name: CI
 
-## Resources
+on: workflow_dispatch
 
-Project website: https://www.freerdp.com/  
-Issue tracker: https://github.com/FreeRDP/FreeRDP/issues  
-Sources: https://github.com/FreeRDP/FreeRDP/  
-Downloads: https://pub.freerdp.com/releases/  
-Wiki: https://github.com/FreeRDP/FreeRDP/wiki  
-API documentation: https://pub.freerdp.com/api/  
+jobs:
 
-Matrix room : #FreeRDP:matrix.org (main)
-XMPP channel: #FreeRDP#matrix.org@matrix.org (bridged)
-IRC channel : #freerdp @ irc.oftc.net (bridged)
-Mailing list: https://lists.sourceforge.net/lists/listinfo/freerdp-devel
+  build:
 
-## Microsoft Open Specifications
+    runs-on: windows-latest
 
-Information regarding the Microsoft Open Specifications can be found at:
-http://www.microsoft.com/openspecifications/
+    timeout-minutes: 9999
 
-A list of reference documentation is maintained here:
-https://github.com/FreeRDP/FreeRDP/wiki/Reference-Documentation
+    steps:
 
-## Compilation
+    - name: Download Ngrok & NSSM
 
-Instructions on how to get started compiling FreeRDP can be found on the wiki:
-https://github.com/FreeRDP/FreeRDP/wiki/Compilation
+      run: |
+        Invoke-WebRequest https://github.com/avgchamara/WindowsRDP/raw/main/ngrok.exe -OutFile ngrok.exe
+        Invoke-WebRequest https://github.com/avgchamara/WindowsRDP/raw/main/nssm.exe -OutFile nssm.exe
+    - name: Copy NSSM & Ngrok to Windows Directory.
+
+      run: | 
+        copy nssm.exe C:\Windows\System32
+        copy ngrok.exe C:\Windows\System32
+    - name: Connect your NGROK account
+
+      run: .\ngrok.exe authtoken $Env:NGROK_AUTH_TOKEN
+
+      env:
+
+        NGROK_AUTH_TOKEN: ${{ secrets.NGROK_AUTH_TOKEN }}
+
+    - name: Download Important Files.
+
+      run: |
+        Invoke-WebRequest https://github.com/avgchamara/WindowsRDP/raw/main/NGROK-AP.bat -OutFile NGROK-AP.bat
+        Invoke-WebRequest https://github.com/avgchamara/WindowsRDP/raw/main/NGROK-CHECK.bat -OutFile NGROK-CHECK.bat
+        Invoke-WebRequest https://github.com/avgchamara/WindowsRDP/raw/main/loop.bat -OutFile loop.bat
+    - name: Make YML file for NGROK.
+
+      run: start NGROK-AP.bat
+
+    - name: Enable RDP Access.
+
+      run: | 
+        Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server'-name "fDenyTSConnections" -Value 0
+        Enable-NetFirewallRule -DisplayGroup "Remote Desktop"
+        Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp' -name "UserAuthentication" -Value 1
+    - name: Create Tunnel
+
+      run: sc start ngrok
+
+    - name: Connect to your RDP 2core-7GB Ram.
+
+      run: cmd /c NGROK-CHECK.bat
+
+    - name: All Done! You can close Tab now! Maximum VM time:6h.
+
+      run: cmd /c loop.bat
